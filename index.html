@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>MACHINECRAFT</title>
+<link rel="stylesheet" href="./src/styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/",
+    "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.14.0/rapier.es.js"
+  }
+}
+</script>
+</head>
+<body>
+  <canvas id="viewport"></canvas>
+
+  <!-- ===================== BOOT / LOADING ===================== -->
+  <div id="boot" class="overlay">
+    <div class="boot-inner">
+      <h1 class="logo">MACHINE<span>CRAFT</span></h1>
+      <div class="boot-status" id="boot-status">Loading physics engine…</div>
+      <div class="boot-bar"><div class="boot-bar-fill" id="boot-bar-fill"></div></div>
+      <div class="boot-error" id="boot-error"></div>
+    </div>
+  </div>
+
+  <!-- ===================== MAIN MENU ===================== -->
+  <div id="main-menu" class="overlay hidden">
+    <div class="menu-panel">
+      <h1 class="logo">MACHINE<span>CRAFT</span></h1>
+      <p class="tagline">Build it. Drive it. Break theirs. Take the pieces.</p>
+      <div class="mp-box" style="margin-top:0;margin-bottom:16px">
+        <input type="text" id="mm-user" placeholder="Username" maxlength="20" autocomplete="off" />
+        <div class="mp-hint">Username does not affect performance.</div>
+      </div>
+      <div class="mp-box" style="margin-bottom:16px">
+        <div class="mp-title">Save Slots <span class="mp-sub">· up to 10 · saved locally</span></div>
+        <div id="mm-slots" class="slots-grid"></div>
+        <div class="mp-hint">Click a slot to play it. Each slot keeps its own vehicle &amp; world — switch freely, they autosave. Shift-click a slot to erase it.</div>
+      </div>
+      <div class="menu-buttons">
+        <button class="btn btn-primary" id="mm-continue" disabled>Continue latest</button>
+        <button class="btn" id="mm-new">New World</button>
+        <button class="btn" id="mm-creative">Creative Mode</button>
+        <button class="btn" id="mm-tester">Tester Mode</button>
+        <button class="btn" id="mm-settings">Settings</button>
+      </div>
+      <div class="mp-box">
+        <div class="mp-title">Multiplayer <span class="mp-sub">· same WiFi · 2 players</span></div>
+        <input type="text" id="mm-room" placeholder="room code (e.g. redbase)" maxlength="24" />
+        <div class="mp-row">
+          <button class="btn small" id="mm-host">Host</button>
+          <button class="btn small" id="mm-join">Join</button>
+        </div>
+        <div class="mp-hint" id="mm-mphint">Host, then share your <b>http://&lt;your-ip&gt;:5173</b> link + room code. Player 2 opens it and taps Join.</div>
+      </div>
+      <div class="menu-foot" id="mm-foot"></div>
+    </div>
+  </div>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <div id="settings-menu" class="overlay hidden">
+    <div class="menu-panel wide">
+      <h2>Settings</h2>
+      <div class="settings-grid">
+        <label for="set-quality">Graphics quality</label>
+        <select id="set-quality">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+
+        <label for="set-shadows">Shadows</label>
+        <select id="set-shadows">
+          <option value="off">Off</option>
+          <option value="on" selected>On</option>
+        </select>
+
+        <label for="set-renderdist">Render distance</label>
+        <input type="range" id="set-renderdist" min="150" max="900" step="25" value="450" />
+
+        <label for="set-sens">Mouse sensitivity</label>
+        <input type="range" id="set-sens" min="0.2" max="3" step="0.05" value="1" />
+
+        <label for="set-volume">Audio volume</label>
+        <input type="range" id="set-volume" min="0" max="1" step="0.05" value="0.6" />
+
+        <label for="set-invert">Invert camera Y</label>
+        <select id="set-invert">
+          <option value="no" selected>No</option>
+          <option value="yes">Yes</option>
+        </select>
+      </div>
+      <h3>Keybindings</h3>
+      <div class="keybind-list" id="keybind-list"></div>
+      <div class="menu-buttons row">
+        <button class="btn" id="set-reset">Reset defaults</button>
+        <button class="btn btn-primary" id="set-back">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PAUSE ===================== -->
+  <div id="pause-menu" class="overlay hidden">
+    <div class="menu-panel">
+      <h2>Paused</h2>
+      <div class="menu-buttons">
+        <button class="btn btn-primary" id="pm-resume">Resume</button>
+        <button class="btn" id="pm-save">Save Game</button>
+        <button class="btn" id="pm-settings">Settings</button>
+        <button class="btn" id="pm-quit">Back to Main Menu</button>
+      </div>
+      <div class="menu-foot" id="pm-foot"></div>
+    </div>
+  </div>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div class="hud-topleft">
+      <div class="hud-vitals">
+        <div class="vital">
+          <span class="vital-label">CAB</span>
+          <div class="bar"><div class="bar-fill cab" id="hud-cab-fill"></div></div>
+          <span class="vital-val" id="hud-cab-val">100%</span>
+        </div>
+        <div class="vital">
+          <span class="vital-label">HULL</span>
+          <div class="bar"><div class="bar-fill hull" id="hud-hull-fill"></div></div>
+          <span class="vital-val" id="hud-hull-val">100%</span>
+        </div>
+      </div>
+      <div class="hud-stats" id="hud-stats"></div>
+    </div>
+
+    <div class="hud-topright">
+      <div class="compass" id="compass">
+        <div class="compass-strip" id="compass-strip"></div>
+        <div class="compass-needle"></div>
+      </div>
+      <div class="radar" id="radar"><div class="radar-sweep"></div><div class="radar-self"></div></div>
+      <canvas class="minimap" id="minimap" width="150" height="150"></canvas>
+    </div>
+
+    <div class="hud-bottomleft">
+      <div class="speedo">
+        <div class="speedo-val" id="hud-speed">0</div>
+        <div class="speedo-unit">km/h</div>
+      </div>
+      <div class="gearbox" id="hud-gear">N</div>
+    </div>
+
+    <div class="hud-bottomright">
+      <div class="hud-hint" id="hud-hint"></div>
+    </div>
+
+    <div class="hud-center">
+      <div class="crosshair" id="crosshair"></div>
+    </div>
+
+    <div id="boss-bar" class="hidden">
+      <div id="boss-name">BOSS</div>
+      <div id="boss-track"><div id="boss-fill"></div></div>
+    </div>
+
+    <div class="hud-toast-wrap" id="toast-wrap"></div>
+    <div class="hud-prompt hidden" id="interact-prompt"></div>
+  </div>
+
+  <!-- ===================== BUILD UI ===================== -->
+  <div id="build-ui" class="hidden">
+    <div class="build-topbar">
+      <div class="build-title">BUILD MODE <span id="build-mode-tag" class="tag">SURVIVAL</span></div>
+      <div class="build-info" id="build-info"></div>
+      <div class="build-actions">
+        <span class="cog-pill" id="build-cogs" title="Cogs — earned by breaking enemy blocks">⚙ 0</span>
+        <button class="btn small" id="bb-shop">🛒 Shop</button>
+        <button class="btn small" id="bb-symmetry">Symmetry: Off</button>
+        <button class="btn small" id="bb-undo">Undo (Z)</button>
+        <button class="btn small" id="bb-redo">Redo (Y)</button>
+        <button class="btn small" id="bb-paint">🎨 Paint</button>
+        <button class="btn small" id="bb-blueprints">Blueprints</button>
+        <button class="btn small btn-primary" id="bb-drive">Drive (B)</button>
+      </div>
+    </div>
+
+    <div class="build-palette" id="build-palette">
+      <div class="palette-cats" id="palette-cats"></div>
+      <div class="palette-items" id="palette-items"></div>
+    </div>
+
+    <div class="build-selected" id="build-selected"></div>
+
+    <div class="build-help">
+      <b>LMB</b> place · <b>X</b> unequip / delete tool · <b>R/T/H</b> rotate X/Y/Z (Shift reverses) · <b>F</b> configure part ·
+      <b>Shift+Wheel</b> cycle block · <b>MMB-drag</b> pan · <b>RMB-drag</b> orbit · <b>Z/Y</b> undo/redo ·
+      <b>M</b> symmetry · <b>Tab</b> inventory · <b>B</b> drive
+    </div>
+  </div>
+
+  <!-- ===================== SHOP ===================== -->
+  <div id="paint-ui" class="overlay hidden">
+    <div class="menu-panel">
+      <h2>Paint Shop</h2>
+      <p class="tagline">Give your machine some colour. Applies to the whole vehicle.</p>
+      <div class="paint-swatches" id="paint-swatches"></div>
+      <div class="paint-custom">
+        <label for="paint-custom-input">Custom</label>
+        <input type="color" id="paint-custom-input" value="#3f92d8" />
+        <button class="btn small" id="paint-clear">Bare metal</button>
+      </div>
+      <div class="menu-buttons row">
+        <button class="btn btn-primary" id="paint-close">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="shop-ui" class="overlay hidden">
+    <div class="menu-panel wide">
+      <h2>Cog Shop <span class="cog-pill" id="shop-cogs">⚙ 0</span></h2>
+      <p class="tagline">Break enemy blocks to earn Cogs, then spend them on parts.</p>
+      <div class="shop-grid" id="shop-grid"></div>
+      <div class="menu-buttons row">
+        <button class="btn" id="shop-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== INVENTORY ===================== -->
+  <div id="inventory-ui" class="overlay hidden">
+    <div class="menu-panel wide">
+      <h2>Inventory</h2>
+      <div class="inv-grid" id="inv-grid"></div>
+      <div class="menu-buttons row">
+        <button class="btn btn-primary" id="inv-close">Close (Tab)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== BLUEPRINTS ===================== -->
+  <div id="blueprint-ui" class="overlay hidden">
+    <div class="menu-panel wide">
+      <h2>Blueprints</h2>
+      <div class="bp-save-row">
+        <input type="text" id="bp-name" placeholder="Blueprint name…" maxlength="40" />
+        <button class="btn btn-primary" id="bp-save">Save current vehicle</button>
+      </div>
+      <div class="bp-list" id="bp-list"></div>
+      <h3>Share codes</h3>
+      <div class="bp-save-row">
+        <input type="text" id="bp-code" placeholder="8-digit code…" inputmode="numeric" maxlength="8" />
+        <button class="btn" id="bp-import">Import</button>
+        <button class="btn btn-primary" id="bp-export">Copy my code</button>
+      </div>
+      <div class="menu-buttons row">
+        <button class="btn" id="bp-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SALVAGE ===================== -->
+  <div id="salvage-ui" class="overlay hidden">
+    <div class="menu-panel wide">
+      <h2>Salvage — <span id="salvage-name">Wreck</span></h2>
+      <p class="salvage-sub">These parts survived the fight. Take what you can use; the rest stays with the wreck.</p>
+      <div class="salvage-list" id="salvage-list"></div>
+      <div class="menu-buttons row">
+        <button class="btn" id="salvage-close">Close (Esc)</button>
+        <button class="btn btn-primary" id="salvage-all">Take All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PART CONFIG (mechanical blocks) ===================== -->
+  <div id="partcfg-ui" class="overlay hidden">
+    <div class="menu-panel">
+      <h2 id="pc-title">Configure Part</h2>
+      <div class="settings-grid" id="pc-body"></div>
+      <div class="menu-buttons row">
+        <button class="btn" id="pc-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DEBUG ===================== -->
+  <div id="debug-overlay" class="hidden"></div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

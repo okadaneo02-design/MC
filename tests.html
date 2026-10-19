@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>MACHINECRAFT — tests</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+    "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.14.0/rapier.es.js"
+  }
+}
+</script>
+<style>
+  body{background:#0b0e12;color:#dbe5ef;font:13px/1.6 "SF Mono",ui-monospace,Menlo,monospace;margin:0;padding:24px}
+  h1{font-size:18px;letter-spacing:.18em;margin:0 0 4px}
+  #summary{margin:14px 0 20px;padding:12px 16px;border-radius:9px;border:1px solid #2a3542;background:#10151c;font-size:15px}
+  #summary.pass{border-color:#2d6b45;color:#9fe8b4}
+  #summary.fail{border-color:#7a2b25;color:#ffb0a8}
+  .grp{margin:18px 0 6px;color:#ffb020;letter-spacing:.14em;font-size:11px;text-transform:uppercase}
+  .row{display:flex;gap:10px;padding:2px 0;align-items:baseline}
+  .mark{width:14px}
+  .ok .mark{color:#5fd07a}.bad .mark{color:#ff5a4d}
+  .bad .name{color:#ffb0a8}
+  .ms{color:#5a6879;font-size:11px;margin-left:auto}
+  .err{color:#ff8a7d;white-space:pre-wrap;margin:2px 0 8px 24px;font-size:12px}
+  #log{color:#5a6879;margin-top:20px;font-size:11px}
+</style>
+</head>
+<body>
+  <h1>MACHINECRAFT — TEST SUITE</h1>
+  <div id="summary">Booting Rapier…</div>
+  <div id="out"></div>
+  <div id="log"></div>
+
+<script type="module">
+import RAPIER from '@dimforge/rapier3d-compat';
+
+const summaryEl = document.getElementById('summary');
+const out = document.getElementById('out');
+
+try {
+  await RAPIER.init();
+  summaryEl.textContent = 'Running…';
+  const { runAll } = await import('./src/tests/suite.js');
+  const res = await runAll();
+
+  let lastGroup = null;
+  for (const r of res.results) {
+    if (r.group !== lastGroup) {
+      lastGroup = r.group;
+      const h = document.createElement('div');
+      h.className = 'grp';
+      h.textContent = r.group;
+      out.appendChild(h);
+    }
+    const row = document.createElement('div');
+    row.className = 'row ' + (r.ok ? 'ok' : 'bad');
+    row.innerHTML = `<span class="mark">${r.ok ? '✓' : '✗'}</span>
+      <span class="name">${r.name}</span><span class="ms">${r.ms.toFixed(1)} ms</span>`;
+    out.appendChild(row);
+    if (!r.ok) {
+      const e = document.createElement('div');
+      e.className = 'err';
+      e.textContent = r.error + (r.stack ? '\n' + r.stack.split('\n').slice(0, 4).join('\n') : '');
+      out.appendChild(e);
+    }
+  }
+
+  summaryEl.className = res.fail === 0 ? 'pass' : 'fail';
+  summaryEl.textContent = `${res.pass} / ${res.total} passed` + (res.fail ? ` — ${res.fail} FAILED` : ' — all green');
+  window.__TEST_RESULTS__ = res;
+  console.log('[tests]', `${res.pass}/${res.total} passed`);
+  for (const r of res.results) if (!r.ok) console.error('[test fail]', r.group, '·', r.name, '·', r.error);
+} catch (err) {
+  summaryEl.className = 'fail';
+  summaryEl.textContent = 'Test harness crashed: ' + (err && err.message ? err.message : err);
+  const e = document.createElement('div');
+  e.className = 'err';
+  e.textContent = err && err.stack ? err.stack : String(err);
+  out.appendChild(e);
+  window.__TEST_RESULTS__ = { total: 0, pass: 0, fail: 1, crashed: String(err && err.stack || err) };
+  console.error(err);
+}
+</script>
+</body>
+</html>

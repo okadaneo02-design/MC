@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MACHINECRAFT — prop inspector</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  html,body{margin:0;height:100%;background:#20242b;color:#cfe}
+  #c{display:block;width:100vw;height:100vh}
+  #hint{position:fixed;left:10px;top:8px;font:13px monospace;opacity:.8}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">green arrow = +Z (forward). each tile is 1 cell. grey box = cell bounds.</div>
+<script type="module">
+import * as THREE from 'three';
+import { preloadModels, createAssetModel, ASSET_MAP } from './src/models/ModelLoader.js';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x20242b);
+const cam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 200);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(6, 12, 8); sun.castShadow = true; scene.add(sun);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200),
+  new THREE.MeshStandardMaterial({ color: 0x2a2f38 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+function label(text, x, z) {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#cfe'; g.font = 'bold 28px monospace'; g.textAlign = 'center';
+  g.fillText(text, 128, 42);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true }));
+  sp.position.set(x, 1.1, z); sp.scale.set(1.4, 0.35, 1); scene.add(sp);
+}
+
+await preloadModels(ASSET_MAP);
+
+const focus = new URLSearchParams(location.search).get('id');
+const focusMode = focus && ASSET_MAP[focus];
+if (focusMode) {
+  const m = createAssetModel(focus);
+  if (m) { m.position.set(0, 0.5, 0); scene.add(m); }
+  const wire = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
+    new THREE.LineBasicMaterial({ color: 0x4a5160 }));
+  wire.position.set(0, 0.5, 0); scene.add(wire);
+  // axes: red=+X(right) green=+Y(up) blue=+Z(forward)
+  const ax = new THREE.AxesHelper(1.4); ax.position.set(0, 0.5, 0); scene.add(ax);
+  scene.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0.05, 0), 1.6, 0x44dd55, 0.3, 0.2));
+  label(focus + '  (blue/green arrow = +Z forward, red = +X right)', 0, -1.2);
+  // near top-down: +Z is screen-DOWN, +X is screen-RIGHT, +Y toward viewer.
+  cam.position.set(0.01, 4.2, 0.9);
+  cam.lookAt(0, 0.4, 0);
+}
+
+const ids = focusMode ? [] : Object.keys(ASSET_MAP);
+const cols = 6, gap = 2.0;
+ids.forEach((id, i) => {
+  const cx = (i % cols - (cols - 1) / 2) * gap;
+  const cz = (Math.floor(i / cols)) * gap;
+  const m = createAssetModel(id);
+  if (m) { m.position.set(cx, 0.5, cz); scene.add(m); }
+  // cell bounds wireframe
+  const wire = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
+    new THREE.LineBasicMaterial({ color: 0x4a5160 }));
+  wire.position.set(cx, 0.5, cz); scene.add(wire);
+  // +Z forward arrow (green)
+  const arr = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(cx, 0.05, cz), 1.1, 0x44dd55, 0.3, 0.18);
+  scene.add(arr);
+  label(id, cx, cz - 0.75);
+});
+
+// Frame the whole grid from front-above so +Z points toward the viewer-bottom.
+if (!focusMode) {
+  const rows = Math.ceil(ids.length / cols);
+  const midZ = (rows - 1) * gap / 2;
+  cam.position.set(0, 7.5, midZ + 11);
+  cam.lookAt(0, 0.4, midZ);
+}
+
+addEventListener('resize', () => {
+  renderer.setSize(innerWidth, innerHeight);
+  cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix();
+});
+renderer.setAnimationLoop(() => renderer.render(scene, cam));
+window._SCENE = scene; window._CAM = cam;
+</script>
+</body>
+</html>

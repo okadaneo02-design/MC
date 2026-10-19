@@ -1,0 +1,20 @@
+{
+  "name": "machinecraft",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Modular vehicle construction, combat and salvage sandbox. Three.js + Rapier 3D.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "ruby tools/serve.rb 5173"
+  },
+  "dependencies": {
+    "three": "0.169.0",
+    "@dimforge/rapier3d-compat": "0.14.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
